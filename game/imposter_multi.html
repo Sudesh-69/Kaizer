@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Insider: With Hints</title>
+    <style>
+        :root {
+            --bg-color: #2c3e50;
+            --card-color: #ecf0f1;
+            --accent: #e74c3c; /* Red for imposter */
+            --safe: #27ae60;   /* Green for innocent */
+            --text-dark: #2c3e50;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--card-color);
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 { margin-bottom: 10px; }
+        p { font-size: 1.1rem; line-height: 1.5; }
+
+        .container {
+            background-color: white;
+            color: var(--text-dark);
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            max-width: 400px;
+            width: 100%;
+            display: none; /* Hidden by default */
+        }
+
+        .active { display: block; }
+
+        input, select {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 2px solid #bdc3c7;
+            border-radius: 5px;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1.1rem;
+            border-radius: 50px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+            transition: transform 0.1s;
+        }
+
+        button:active { transform: scale(0.98); }
+
+        .player-list { list-style: none; padding: 0; text-align: left; }
+        .player-list li { 
+            background: #eee; 
+            margin: 5px 0; 
+            padding: 8px; 
+            border-radius: 5px; 
+            display: flex; 
+            justify-content: space-between; 
+        }
+
+        .secret-reveal {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+        }
+
+        .hint-text {
+            font-size: 1.2rem;
+            color: #7f8c8d;
+            font-style: italic;
+            margin-top: 10px;
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🕵️ The Insider</h1>
+
+    <div id="setup-screen" class="container active">
+        <h3>Add Players</h3>
+        <div style="display:flex; gap:5px;">
+            <input type="text" id="playerName" placeholder="Enter Name">
+            <button onclick="addPlayer()" style="width: auto;">+</button>
+        </div>
+        <ul id="playerListDisplay" class="player-list"></ul>
+        
+        <hr>
+        
+        <label>Category:</label>
+        <select id="categorySelect">
+            <option value="animals">Animals</option>
+            <option value="food">Food</option>
+            <option value="places">Places</option>
+            <option value="objects">Household Objects</option>
+        </select>
+
+        <button onclick="startGame()">Start Game</button>
+        <p style="font-size: 0.8rem; color: #7f8c8d;">Minimum 3 players required.</p>
+    </div>
+
+    <div id="pass-screen" class="container">
+        <h3>Pass the device to:</h3>
+        <h2 id="currentPlayerName" style="color:var(--text-dark); font-size: 2rem; margin: 20px 0;">Name</h2>
+        <p>Ensure no one else is looking!</p>
+        <button onclick="revealRole()">Reveal My Role</button>
+    </div>
+
+    <div id="reveal-screen" class="container">
+        <h3>Your Secret Role:</h3>
+        
+        <div id="roleDisplay" class="secret-reveal">???</div>
+        
+        <div id="hintDisplay" class="hint-text">...</div>
+
+        <button onclick="nextPlayer()">Got it! (Hide)</button>
+    </div>
+
+    <div id="game-screen" class="container">
+        <h2>All roles assigned!</h2>
+        <p>1. The youngest player starts describing the word.</p>
+        <p>2. Go clockwise. Don't be too obvious!</p>
+        <p>3. Vote when ready.</p>
+        
+        <div style="background:#f1c40f; padding:10px; border-radius:5px; color:#000; margin-bottom:15px;">
+            <strong>Category:</strong> <span id="gameCategory"></span>
+        </div>
+
+        <button onclick="endGame()">Reveal The Insider</button>
+    </div>
+
+    <div id="result-screen" class="container">
+        <h2>Game Over!</h2>
+        <p>The Secret Word was:</p>
+        <h1 id="finalWord" style="color:var(--safe)">WORD</h1>
+        
+        <hr>
+        <p>The Insider was:</p>
+        <h2 id="imposterName" style="color:var(--accent)">Name</h2>
+        
+        <button onclick="resetGame()">Play Again</button>
+    </div>
+
+    <script>
+        // --- UPDATED DATA WITH HINTS ---
+        const wordBank = {
+            animals: [
+                { word: "Lion", hint: "It's a large wild cat" },
+                { word: "Penguin", hint: "A bird that likes cold, but can't fly" },
+                { word: "Giraffe", hint: "Known for being very tall" },
+                { word: "Elephant", hint: "Large, grey, and has a trunk" },
+                { word: "Snake", hint: "No legs, slithers on ground" },
+                { word: "Shark", hint: "Dangerous predator in the ocean" }
+            ],
+            food: [
+                { word: "Pizza", hint: "Round, Italian, cheese and tomato" },
+                { word: "Sushi", hint: "Japanese, often raw fish and rice" },
+                { word: "Ice Cream", hint: "Cold, sweet dessert" },
+                { word: "Hamburger", hint: "American fast food sandwich" },
+                { word: "Spaghetti", hint: "Long pasta strings" },
+                { word: "Tacos", hint: "Mexican, crunchy or soft shell" }
+            ],
+            places: [
+                { word: "Hospital", hint: "Where you go when sick" },
+                { word: "School", hint: "Place for learning and students" },
+                { word: "Beach", hint: "Sand, ocean, and sun" },
+                { word: "Library", hint: "Quiet place with many books" },
+                { word: "Airport", hint: "Where planes take off and land" },
+                { word: "Gym", hint: "Place to exercise and lift weights" }
+            ],
+            objects: [
+                { word: "Toaster", hint: "Makes bread hot and crunchy" },
+                { word: "Toothbrush", hint: "Used for cleaning inside your mouth" },
+                { word: "Chair", hint: "Furniture you sit on" },
+                { word: "Laptop", hint: "Portable computer" },
+                { word: "Umbrella", hint: "Protects you from rain" },
+                { word: "Spoon", hint: "Utensil for eating soup" }
+            ]
+        };
+
+        let players = [];
+        let currentTurn = 0;
+        let currentSecretObject = {}; // Holds both word and hint
+        let imposterIndex = 0;
+
+        // --- SETUP LOGIC ---
+        function addPlayer() {
+            const input = document.getElementById("playerName");
+            const name = input.value.trim();
+            if (name) {
+                players.push(name);
+                updatePlayerList();
+                input.value = "";
+                input.focus();
+            }
+        }
+
+        function updatePlayerList() {
+            const list = document.getElementById("playerListDisplay");
+            list.innerHTML = players.map(p => `<li>${p}</li>`).join('');
+        }
+
+        function startGame() {
+            if (players.length < 3) {
+                alert("You need at least 3 players!");
+                return;
+            }
+
+            // 1. Pick Category & Word Object
+            const category = document.getElementById("categorySelect").value;
+            const wordsList = wordBank[category];
+            // Pick a random object {word, hint}
+            currentSecretObject = wordsList[Math.floor(Math.random() * wordsList.length)];
+
+            // 2. Assign Imposter
+            imposterIndex = Math.floor(Math.random() * players.length);
+            currentTurn = 0;
+
+            // 3. UI Switch
+            switchScreen('pass-screen');
+            updatePassScreen();
+            
+            document.getElementById("gameCategory").innerText = category.toUpperCase();
+        }
+
+        // --- TURN LOGIC ---
+        function updatePassScreen() {
+            document.getElementById("currentPlayerName").innerText = players[currentTurn];
+        }
+
+        function revealRole() {
+            switchScreen('reveal-screen');
+            const roleBox = document.getElementById("roleDisplay");
+            const hintBox = document.getElementById("hintDisplay");
+
+            // CHECK IF IMPOSTER
+            if (currentTurn === imposterIndex) {
+                // Imposter View
+                roleBox.innerText = "YOU ARE THE INSIDER";
+                roleBox.style.color = "#c0392b"; // Red
+                roleBox.style.borderColor = "#c0392b";
+                
+                // SHOW THE HINT
+                hintBox.innerText = "HINT: " + currentSecretObject.hint;
+            } else {
+                // Civilian View
+                roleBox.innerText = currentSecretObject.word;
+                roleBox.style.color = "#27ae60"; // Green
+                roleBox.style.borderColor = "#27ae60";
+                
+                hintBox.innerText = "Describe this word subtly!";
+            }
+        }
+
+        function nextPlayer() {
+            currentTurn++;
+            if (currentTurn < players.length) {
+                switchScreen('pass-screen');
+                updatePassScreen();
+            } else {
+                switchScreen('game-screen');
+            }
+        }
+
+        // --- END GAME ---
+        function endGame() {
+            document.getElementById("finalWord").innerText = currentSecretObject.word;
+            document.getElementById("imposterName").innerText = players[imposterIndex];
+            switchScreen('result-screen');
+        }
+
+        function resetGame() {
+            switchScreen('setup-screen');
+            currentTurn = 0;
+        }
+
+        // --- UTILS ---
+        function switchScreen(screenId) {
+            document.querySelectorAll('.container').forEach(div => div.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+    </script>
+</body>
+</html>
